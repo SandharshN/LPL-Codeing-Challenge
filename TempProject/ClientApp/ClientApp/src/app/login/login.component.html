@@ -1,0 +1,14 @@
+<form (ngSubmit)="login()">
+  <div class="col-lg-12">
+    <div *ngIf="showError" style="color:red;">Username password are incorrect.</div>
+    <div class="row">
+      <label>User name</label>
+      <input type="text" name="Username" [(ngModel)]="Username" />
+    </div>
+    <div class="row">
+      <label>Password</label>
+      <input type="password" name="Password" [(ngModel)]="Password" />
+    </div>
+    <button type="submit" (click)="login()"> Login </button>>
+  </div>
+</form>
