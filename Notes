@@ -1,0 +1,1412 @@
+Build a Team-Grade Claude Code Context Optimizer
+
+You are building an internal developer productivity tool called ContextPilot.
+
+The goal is to create a team-distributable Claude Code plugin + MCP server inspired by the ideas behind Ponytail, but significantly more capable.
+
+The primary goal is:
+
+Reduce unnecessary Claude Code token consumption and agentic work WITHOUT reducing correctness, security, test coverage, maintainability, or developer productivity.
+
+The tool should intelligently minimize:
+
+* unnecessary context
+* unnecessary file reads
+* duplicate searches
+* unnecessary tool calls
+* unnecessary generated code
+* unnecessary abstractions
+* unnecessary dependencies
+* unnecessary explanations
+* unnecessary refactoring
+* repeated exploration of the same code
+
+The tool must NOT simply tell Claude “write less code.” It must actively help Claude identify the smallest relevant portion of a repository before implementation.
+
+⸻
+
+1. PRODUCT NAME
+
+Use:
+
+ContextPilot
+
+Tagline:
+
+“Give Claude the context it needs — not the context it can find.”
+
+⸻
+
+2. PRIMARY ARCHITECTURE
+
+Build two components:
+
+Component A — Claude Code Plugin
+
+Responsible for:
+
+* behavioral instructions
+* slash commands
+* hooks
+* team configuration
+* developer-facing UX
+
+Component B — ContextPilot MCP Server
+
+Responsible for:
+
+* repository indexing
+* symbol discovery
+* dependency analysis
+* relevant-file discovery
+* Git analysis
+* context ranking
+* context summarization
+* token estimation
+* optimization metrics
+
+The plugin should call the MCP server when deeper repository analysis is useful.
+
+⸻
+
+3. TECHNOLOGY CHOICE
+
+Use the following technologies unless there is a compelling reason not to:
+
+MCP server
+
+Use TypeScript/Node.js initially.
+
+Reason:
+
+* easy Claude Code distribution
+* easy npm packaging
+* easy MCP integration
+* cross-platform
+
+Use the official MCP SDK.
+
+Code intelligence
+
+Initially support:
+
+1. .NET / C#
+2. TypeScript
+3. JavaScript
+
+.NET should receive the deepest semantic analysis.
+
+For C#:
+
+Use Roslyn where practical.
+
+The system should understand:
+
+* classes
+* interfaces
+* methods
+* properties
+* constructors
+* inheritance
+* implementations
+* method calls
+* dependency injection
+* project references
+* namespaces
+* using directives
+
+Do NOT implement a full compiler yourself.
+
+If Roslyn integration becomes too complicated for the first release, create a clean abstraction:
+
+CodeAnalyzer
+    ├── CSharpAnalyzer
+    ├── TypeScriptAnalyzer
+    └── JavaScriptAnalyzer
+
+so Roslyn can be improved later.
+
+⸻
+
+4. REPOSITORY STRUCTURE
+
+Create this structure:
+
+contextpilot/
+│
+├── README.md
+├── LICENSE
+├── package.json
+├── tsconfig.json
+├── .gitignore
+├── .npmignore
+│
+├── src/
+│   ├── index.ts
+│   │
+│   ├── mcp/
+│   │   ├── server.ts
+│   │   └── tools/
+│   │       ├── analyze-repository.ts
+│   │       ├── find-relevant-files.ts
+│   │       ├── find-symbol.ts
+│   │       ├── dependency-graph.ts
+│   │       ├── search-code.ts
+│   │       ├── git-context.ts
+│   │       ├── estimate-tokens.ts
+│   │       └── optimize-context.ts
+│   │
+│   ├── indexing/
+│   │   ├── repository-index.ts
+│   │   ├── file-index.ts
+│   │   ├── symbol-index.ts
+│   │   └── dependency-index.ts
+│   │
+│   ├── analyzers/
+│   │   ├── code-analyzer.ts
+│   │   ├── csharp/
+│   │   ├── typescript/
+│   │   └── javascript/
+│   │
+│   ├── ranking/
+│   │   ├── relevance-scorer.ts
+│   │   ├── context-ranker.ts
+│   │   └── token-budget.ts
+│   │
+│   ├── git/
+│   │   └── git-service.ts
+│   │
+│   ├── config/
+│   │   └── configuration.ts
+│   │
+│   └── telemetry/
+│       └── metrics.ts
+│
+├── plugin/
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   │
+│   ├── commands/
+│   │   ├── contextpilot.md
+│   │   ├── contextpilot-review.md
+│   │   ├── contextpilot-audit.md
+│   │   ├── contextpilot-explain.md
+│   │   └── contextpilot-stats.md
+│   │
+│   ├── skills/
+│   │   └── minimal-implementation/
+│   │       └── SKILL.md
+│   │
+│   └── hooks/
+│       └── hooks.json
+│
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── fixtures/
+│
+├── docs/
+│   ├── architecture.md
+│   ├── installation.md
+│   ├── configuration.md
+│   ├── mcp-tools.md
+│   └── benchmarking.md
+│
+└── examples/
+    └── dotnet-sample/
+
+⸻
+
+5. IMPORTANT DESIGN PRINCIPLE
+
+ContextPilot must NOT blindly reduce context.
+
+The ranking system should prioritize:
+
+Correctness
+    >
+Security
+    >
+Required context
+    >
+Tests
+    >
+Architecture
+    >
+Token efficiency
+
+Token reduction is NEVER allowed to override required context.
+
+For example:
+
+If a change modifies authentication, the system must not exclude:
+
+* authentication middleware
+* authorization policies
+* relevant configuration
+* security tests
+* token validation
+* related interfaces
+
+just because doing so saves tokens.
+
+⸻
+
+6. MCP TOOLS
+
+Implement these MCP tools.
+
+Tool 1: analyze_repository
+
+Input:
+
+{
+  "path": "."
+}
+
+Return:
+
+{
+  "language": "C#",
+  "projects": [],
+  "fileCount": 0,
+  "testProjects": [],
+  "entryPoints": [],
+  "architecture": {},
+  "dependencies": {}
+}
+
+Detect:
+
+* language
+* solution files
+* project files
+* test projects
+* APIs
+* workers
+* libraries
+* dependency relationships
+
+Cache the result.
+
+⸻
+
+7. find_relevant_files
+
+This is the most important tool.
+
+Input:
+
+{
+  "task": "Add retry logic to the payment API",
+  "path": ".",
+  "maxFiles": 15
+}
+
+Return ranked files:
+
+[
+  {
+    "path": "PaymentController.cs",
+    "score": 0.97,
+    "reason": "API entry point"
+  },
+  {
+    "path": "PaymentService.cs",
+    "score": 0.95,
+    "reason": "Contains payment execution logic"
+  }
+]
+
+The scoring system should consider:
+
+* filename relevance
+* symbol relevance
+* semantic relevance
+* references
+* callers
+* callees
+* inheritance
+* dependency injection
+* project relationship
+* recent Git changes
+* tests
+* configuration
+* task keywords
+
+Do NOT simply use filename matching.
+
+⸻
+
+8. find_symbol
+
+Input:
+
+{
+  "name": "PaymentService"
+}
+
+Return:
+
+{
+  "symbol": "PaymentService",
+  "file": "PaymentService.cs",
+  "kind": "class",
+  "methods": [],
+  "interfaces": [],
+  "baseTypes": [],
+  "references": []
+}
+
+Support:
+
+* class
+* interface
+* method
+* property
+* enum
+* record
+* namespace
+
+⸻
+
+9. dependency_graph
+
+Input:
+
+{
+  "symbol": "PaymentService"
+}
+
+Return a dependency graph.
+
+Example:
+
+PaymentController
+       ↓
+PaymentService
+       ↓
+IPaymentRepository
+       ↓
+PaymentRepository
+       ↓
+DbContext
+
+Also support reverse dependency:
+
+DbContext
+   ↑
+PaymentRepository
+   ↑
+PaymentService
+   ↑
+PaymentController
+
+This is critical for deciding what context Claude actually needs.
+
+⸻
+
+10. search_code
+
+Provide semantic-ish code search.
+
+Input:
+
+{
+  "query": "where payment transactions are saved",
+  "maxResults": 20
+}
+
+Combine:
+
+* text search
+* symbol search
+* filename search
+* code structure
+* references
+
+Use ripgrep where appropriate.
+
+Do NOT load entire files when only symbol-level information is necessary.
+
+⸻
+
+11. git_context
+
+Input:
+
+{
+  "path": "."
+}
+
+Return:
+
+* current branch
+* recent commits
+* modified files
+* uncommitted files
+* files changed recently
+* relevant historical changes
+
+The ranking system should use recent changes as a relevance signal.
+
+⸻
+
+12. estimate_tokens
+
+Input:
+
+{
+  "files": [
+    "PaymentService.cs",
+    "PaymentRepository.cs"
+  ]
+}
+
+Return estimated token count.
+
+Also support:
+
+{
+  "files": [],
+  "mode": "repository"
+}
+
+Use a local tokenizer or a reasonable deterministic approximation.
+
+Clearly label it as an estimate.
+
+⸻
+
+13. optimize_context
+
+This is the primary tool.
+
+Input:
+
+{
+  "task": "Add retry logic to payment processing",
+  "path": ".",
+  "tokenBudget": 30000
+}
+
+Return:
+
+{
+  "task": "...",
+  "selectedFiles": [],
+  "excludedFiles": [],
+  "symbols": [],
+  "dependencies": [],
+  "tests": [],
+  "configuration": [],
+  "estimatedTokens": 12000,
+  "estimatedSavings": 58,
+  "reasoning": []
+}
+
+The output should tell Claude:
+
+1. What files matter
+2. Why they matter
+3. Which symbols matter
+4. Which dependencies matter
+5. Which tests matter
+6. Which configuration matters
+7. What can safely be ignored
+
+⸻
+
+14. CONTEXT RANKING ALGORITHM
+
+Create a transparent scoring system.
+
+Example:
+
+score =
+    semanticRelevance * 0.30
+  + symbolRelevance * 0.20
+  + dependencyRelevance * 0.15
+  + referenceRelevance * 0.10
+  + testRelevance * 0.10
+  + gitRelevance * 0.05
+  + configurationRelevance * 0.05
+  + architecturalRelevance * 0.05
+
+Make weights configurable.
+
+Do not pretend the score is mathematically perfect.
+
+The purpose is ranking.
+
+⸻
+
+15. CLAUDE CODE BEHAVIOR
+
+Create the ContextPilot skill.
+
+The skill should instruct Claude:
+
+Before implementing:
+
+1. Understand the request.
+2. Determine the likely affected subsystem.
+3. Use ContextPilot to identify relevant files when the repository is large.
+4. Prefer existing implementations.
+5. Prefer framework/BCL functionality.
+6. Prefer existing dependencies.
+7. Avoid unnecessary abstractions.
+8. Avoid unrelated refactoring.
+9. Avoid creating wrappers around existing APIs.
+10. Avoid adding dependencies unless necessary.
+11. Preserve security.
+12. Preserve validation.
+13. Preserve error handling.
+14. Preserve tests.
+15. Implement the smallest correct solution.
+
+However:
+
+DO NOT require ContextPilot for every trivial task.
+
+For example:
+
+Rename this variable
+
+should not trigger expensive repository analysis.
+
+Use it when:
+
+* repository > configurable file count
+* task affects multiple components
+* architecture is unclear
+* Claude is about to read many files
+* task involves unfamiliar code
+* task involves debugging
+* task involves cross-project dependencies
+
+⸻
+
+16. PONYTAIL-STYLE MODES
+
+Implement:
+
+/contextpilot minimal
+/contextpilot normal
+/contextpilot deep
+/contextpilot off
+
+minimal
+
+Aggressively optimize context and implementation.
+
+normal
+
+Balanced behavior.
+
+deep
+
+Prefer completeness over token savings.
+
+off
+
+Disable behavioral optimization but MCP tools remain available.
+
+Default:
+
+normal
+
+⸻
+
+17. SLASH COMMANDS
+
+Implement:
+
+/contextpilot
+
+Show current mode.
+
+Example:
+
+ContextPilot
+Mode: normal
+Repository: 423 files
+Indexed: yes
+Estimated repository tokens: 1.8M
+Run:
+/contextpilot minimal
+/contextpilot deep
+/contextpilot stats
+
+⸻
+
+/contextpilot-review
+
+Analyze the current Git diff.
+
+Find:
+
+* unnecessary code
+* duplicate code
+* unnecessary abstraction
+* unnecessary dependency
+* existing helper that could be reused
+* unnecessary files
+* unrelated changes
+* missing tests
+
+Do NOT automatically change code.
+
+Output recommendations.
+
+⸻
+
+/contextpilot-audit
+
+Analyze the repository.
+
+Look for:
+
+* duplicated functionality
+* unnecessary abstractions
+* dead-looking code
+* excessive wrappers
+* unnecessary dependencies
+* repeated utility implementations
+* opportunities to use framework APIs
+* architectural complexity
+
+Do not automatically delete anything.
+
+⸻
+
+/contextpilot-explain
+
+Explain why ContextPilot selected certain files.
+
+Example:
+
+PaymentService.cs
+Score: 0.94
+Reasons:
+- Contains target method
+- Called by PaymentController
+- Implements relevant interface
+- Modified in previous payment-related commits
+
+⸻
+
+/contextpilot-stats
+
+Display:
+
+ContextPilot Statistics
+Repository:
+Files: 423
+Symbols: 18,291
+Current session:
+Estimated context:
+Before optimization: 74,000 tokens
+After optimization: 31,000 tokens
+Estimated reduction: 58%
+Files selected: 14
+Files excluded: 409
+
+Clearly label estimates as estimates.
+
+⸻
+
+18. AUTOMATIC CONTEXT OPTIMIZATION
+
+Do NOT attempt to intercept Claude’s internal token stream.
+
+Instead, influence Claude’s behavior through:
+
+* plugin instructions
+* skills
+* MCP tools
+* hooks where appropriate
+
+Claude Code supports MCP integrations, including project-scoped MCP configuration, so provide a project-level configuration that can be checked into source control when appropriate.
+
+Do not assume undocumented Claude Code internals.
+
+⸻
+
+19. HOOKS
+
+Use hooks conservatively.
+
+Do NOT create a hook that runs expensive repository indexing on every tool call.
+
+Instead:
+
+* initialize/index when appropriate
+* detect repository changes
+* invalidate cache intelligently
+
+Never cause noticeable latency on every Claude operation.
+
+Provide configuration:
+
+{
+  "indexing": {
+    "enabled": true,
+    "maxRepositoryFiles": 10000,
+    "autoRefresh": true
+  }
+}
+
+⸻
+
+20. INDEXING
+
+Create a local repository index.
+
+Do NOT upload source code anywhere.
+
+Default storage:
+
+.contextpilot/
+
+Example:
+
+.contextpilot/
+├── index.json
+├── symbols.json
+├── dependencies.json
+├── metadata.json
+└── cache/
+
+Add .contextpilot/ to .gitignore by default.
+
+The index must be rebuildable.
+
+Never make the repository dependent on the index.
+
+⸻
+
+21. PRIVACY
+
+This is a team/enterprise tool.
+
+Therefore:
+
+DEFAULT:
+
+No source code leaves the developer machine.
+No telemetry leaves the developer machine.
+No external AI API is required by ContextPilot.
+
+Do not send repository contents to:
+
+* OpenAI
+* Anthropic
+* Google
+* third-party analytics
+* hosted databases
+
+unless explicitly configured by the organization in a future version.
+
+⸻
+
+22. SECURITY
+
+Treat repository code as sensitive.
+
+Never:
+
+* execute arbitrary repository code
+* send source to external services
+* expose environment variables
+* read secrets unnecessarily
+* print API keys
+* index .env
+* index credential files
+
+Ignore by default:
+
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+credentials.json
+secrets.json
+node_modules
+bin
+obj
+.git
+
+Make ignore patterns configurable.
+
+⸻
+
+23. CONFIGURATION
+
+Support:
+
+.contextpilot/config.json
+
+Example:
+
+{
+  "mode": "normal",
+  "indexing": {
+    "enabled": true,
+    "autoRefresh": true
+  },
+  "ranking": {
+    "semanticRelevance": 0.30,
+    "symbolRelevance": 0.20,
+    "dependencyRelevance": 0.15,
+    "referenceRelevance": 0.10,
+    "testRelevance": 0.10,
+    "gitRelevance": 0.05,
+    "configurationRelevance": 0.05,
+    "architectureRelevance": 0.05
+  },
+  "limits": {
+    "maxFiles": 20,
+    "maxTokens": 30000
+  },
+  "privacy": {
+    "telemetry": false
+  }
+}
+
+Validate configuration.
+
+Provide sensible defaults.
+
+⸻
+
+24. .NET SPECIALIZATION
+
+This is important.
+
+Optimize ContextPilot particularly well for enterprise .NET repositories.
+
+Detect:
+
+.sln
+.slnx
+.csproj
+Directory.Build.props
+Directory.Build.targets
+Directory.Packages.props
+NuGet.config
+appsettings.json
+Program.cs
+Startup.cs
+
+Understand:
+
+ASP.NET Core
+Entity Framework Core
+Dependency Injection
+Controllers
+Minimal APIs
+Middleware
+Hosted Services
+Options pattern
+HttpClientFactory
+Repositories
+Services
+Interfaces
+DTOs
+Validators
+
+Recognize common relationships.
+
+Example:
+
+Controller
+ → Service
+ → Repository
+ → DbContext
+
+If Claude is modifying a controller method, prioritize:
+
+* controller
+* called service
+* relevant interface
+* DTO
+* validation
+* relevant tests
+
+Do not automatically include every repository/service in the solution.
+
+⸻
+
+25. TEST DISCOVERY
+
+Tests are critical context.
+
+Find related tests through:
+
+* naming
+* namespaces
+* class names
+* method names
+* project references
+* symbol references
+
+Example:
+
+PaymentService.cs
+Relevant:
+PaymentServiceTests.cs
+PaymentIntegrationTests.cs
+
+Do not include unrelated tests merely because they are in the same project.
+
+⸻
+
+26. TOKEN OPTIMIZATION STRATEGY
+
+ContextPilot should optimize along several dimensions.
+
+Level 1 — File selection
+
+Don’t read irrelevant files.
+
+Level 2 — Symbol selection
+
+Don’t read irrelevant parts of relevant files when possible.
+
+Level 3 — Dependency selection
+
+Only follow dependencies required to understand the task.
+
+Level 4 — Historical selection
+
+Use Git history only when useful.
+
+Level 5 — Test selection
+
+Load relevant tests.
+
+Level 6 — Configuration selection
+
+Load configuration only when relevant.
+
+⸻
+
+27. IMPORTANT: DO NOT OVER-OPTIMIZE
+
+A dangerous implementation would say:
+
+Only include files containing the user's keywords.
+
+Do NOT do that.
+
+For example:
+
+Task:
+
+Fix authentication failure
+
+Relevant files might have names:
+
+AuthenticationMiddleware.cs
+TokenValidator.cs
+SecurityConfiguration.cs
+AuthorizationPolicy.cs
+Program.cs
+
+even if only one contains the word “authentication.”
+
+Use relationships and architecture.
+
+⸻
+
+28. BENCHMARKING
+
+Build a benchmark framework.
+
+Create test scenarios such as:
+
+1. Add API endpoint
+2. Modify existing service
+3. Fix bug
+4. Add database field
+5. Add validation
+6. Change authentication
+7. Modify configuration
+8. Add background job
+9. Refactor existing functionality
+10. Debug failing test
+
+Measure:
+
+baseline estimated tokens
+optimized estimated tokens
+reduction percentage
+files read
+files avoided
+tool calls avoided
+task correctness
+tests passed
+
+Do NOT claim token savings unless measured.
+
+Clearly distinguish:
+
+estimated savings
+
+from actual provider billing/token metrics.
+
+⸻
+
+29. GOLDEN TESTS
+
+Create representative repositories under:
+
+tests/fixtures/
+
+At minimum:
+
+dotnet-small/
+dotnet-medium/
+dotnet-large/
+typescript-medium/
+
+For each task create expected relevant files.
+
+Example:
+
+Task:
+"Add retry handling to PaymentService"
+Expected:
+PaymentService.cs
+IPaymentService.cs
+PaymentServiceTests.cs
+PaymentRepository.cs
+Unexpected:
+CustomerController.cs
+ReportingService.cs
+EmailService.cs
+
+Build regression tests around these.
+
+⸻
+
+30. CLI
+
+Also expose:
+
+contextpilot index
+contextpilot analyze
+contextpilot search "PaymentService"
+contextpilot relevant "Add retry handling to payments"
+contextpilot graph PaymentService
+contextpilot stats
+contextpilot audit
+
+Example:
+
+contextpilot relevant "Add retry handling to payments" --max-files 15
+
+Return human-readable output.
+
+Also support:
+
+--json
+
+for machine-readable output.
+
+⸻
+
+31. DISTRIBUTION
+
+Make the project easy for a development team to adopt.
+
+Provide:
+
+npm install
+npm run build
+
+and a simple setup process.
+
+The ideal team setup should eventually be:
+
+contextpilot install
+
+or project configuration that automatically makes the plugin/MCP available.
+
+Document both:
+
+* developer-local installation
+* team/project installation
+
+Do not require developers to manually edit large configuration files.
+
+⸻
+
+32. DOCUMENTATION
+
+README must contain:
+
+1. What ContextPilot is
+2. Why it exists
+3. Architecture
+4. Installation
+5. Claude Code setup
+6. MCP setup
+7. Configuration
+8. Commands
+9. .NET support
+10. Security/privacy
+11. Benchmarking
+12. Limitations
+13. Troubleshooting
+
+Include diagrams.
+
+⸻
+
+33. ERROR HANDLING
+
+MCP failures must never make Claude Code unusable.
+
+If ContextPilot fails:
+
+ContextPilot unavailable.
+Continuing without context optimization.
+
+Claude should continue normally.
+
+Never block development because the index is corrupt.
+
+Provide:
+
+contextpilot rebuild
+
+⸻
+
+34. PERFORMANCE
+
+Indexing should be incremental.
+
+Do not re-index unchanged files.
+
+Use file hashes/timestamps.
+
+Target:
+
+* small repo: <2 seconds incremental update
+* medium repo: <5 seconds
+* large repo: reasonable background/incremental operation
+
+Measure rather than blindly claim these numbers.
+
+⸻
+
+35. LOGGING
+
+Default logging:
+
+errors only
+
+Support:
+
+--verbose
+
+Never log:
+
+* source contents
+* secrets
+* environment variables
+* tokens
+* credentials
+
+unless explicitly requested for debugging and safe to do so.
+
+⸻
+
+36. IMPLEMENTATION PHASES
+
+Do NOT try to build everything at once.
+
+Implement in these phases.
+
+Phase 1
+
+Working MCP server.
+
+Implement:
+
+* analyze_repository
+* search_code
+* find_symbol
+* estimate_tokens
+
+Add tests.
+
+⸻
+
+Phase 2
+
+Repository indexing.
+
+Implement:
+
+* file index
+* symbol index
+* dependency index
+* caching
+
+⸻
+
+Phase 3
+
+Context ranking.
+
+Implement:
+
+* relevance scoring
+* find_relevant_files
+* optimize_context
+
+⸻
+
+Phase 4
+
+.NET intelligence.
+
+Implement:
+
+* C# symbol analysis
+* project references
+* dependency injection detection
+* controller/service/repository relationships
+* test discovery
+
+⸻
+
+Phase 5
+
+Claude Code plugin.
+
+Implement:
+
+* plugin.json
+* SKILL.md
+* slash commands
+* configuration
+
+⸻
+
+Phase 6
+
+Git intelligence.
+
+Implement:
+
+* git_context
+* changed-file ranking
+* history signals
+
+⸻
+
+Phase 7
+
+Benchmarking.
+
+Build benchmark suite and measure results.
+
+⸻
+
+Phase 8
+
+Packaging.
+
+Prepare:
+
+* npm package
+* installation documentation
+* team deployment
+* versioning
+* release process
+
+⸻
+
+37. DEVELOPMENT RULE
+
+After every phase:
+
+1. Build
+2. Run unit tests
+3. Run integration tests
+4. Run lint
+5. Test MCP server manually
+6. Update documentation
+7. Commit changes
+
+Do not proceed to the next phase with failing tests.
+
+⸻
+
+38. CODE QUALITY
+
+Follow these principles:
+
+* simple code
+* strong typing
+* dependency injection only where useful
+* no unnecessary abstraction
+* small functions
+* explicit error handling
+* unit tests
+* integration tests
+* meaningful names
+* no speculative features
+
+Do NOT build an elaborate enterprise architecture for this tool itself.
+
+Ironically, ContextPilot must follow its own philosophy.
+
+⸻
+
+39. FIRST DELIVERABLE
+
+Start by implementing ONLY Phase 1.
+
+Do not implement the entire roadmap immediately.
+
+Before writing code:
+
+1. Inspect the current repository.
+2. Create the project structure.
+3. Explain the architecture briefly.
+4. Implement Phase 1.
+5. Run tests.
+6. Demonstrate the MCP tools.
+7. Show an example using a sample .NET repository.
+8. Report what works and what remains.
+
+Then wait for the next instruction.
+
+⸻
+
+40. ACCEPTANCE CRITERIA FOR PHASE 1
+
+Phase 1 is complete only when:
+
+[ ] npm install works
+[ ] npm run build works
+[ ] npm test works
+[ ] MCP server starts
+[ ] analyze_repository works
+[ ] search_code works
+[ ] find_symbol works
+[ ] estimate_tokens works
+[ ] errors are handled
+[ ] no source code leaves the machine
+[ ] README explains setup
+[ ] tests cover core functionality
+
+Do not mark Phase 1 complete until all criteria are satisfied.
+
+Start now.
