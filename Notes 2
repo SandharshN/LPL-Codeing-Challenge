@@ -1,0 +1,384 @@
+Phase 1 is complete and verified.
+
+Proceed to Phase 2 of ContextPilot.
+
+Before writing code, inspect the existing Phase 1 implementation and tests. Do not rewrite working Phase 1 functionality unless necessary.
+
+Phase 2 goal:
+
+Build a persistent, incremental repository intelligence/indexing system that becomes the foundation for ContextPilot's future context-ranking engine.
+
+The index must be:
+- local-only
+- deterministic
+- rebuildable
+- incrementally updated
+- safe for large enterprise repositories
+- security-conscious
+- independent of any LLM/API
+- backward compatible with all Phase 1 MCP tools
+
+Implement the following.
+
+1. FILE INDEX
+
+Create a persistent file index containing, at minimum:
+
+- relative path
+- extension
+- language
+- file size
+- modification timestamp
+- content hash
+- line count
+- approximate token count
+- ignored/not-ignored status
+- project/solution association where detectable
+
+Do not store full source contents in the persistent index unless there is a compelling reason.
+
+Use content hashes to detect changes.
+
+2. SYMBOL INDEX
+
+Extend the existing CodeAnalyzer abstraction to produce a persistent symbol index.
+
+For C#, index at minimum:
+
+- namespace
+- class
+- interface
+- record
+- struct
+- enum
+- method
+- constructor
+- property
+- field
+
+For each symbol capture:
+
+- fully qualified name
+- symbol kind
+- file
+- start line
+- end line
+- parent symbol
+- base types
+- implemented interfaces
+
+Also capture references when practical.
+
+For TypeScript/JavaScript implement the equivalent best-effort symbol model.
+
+Do not sacrifice the clean CodeAnalyzer abstraction.
+
+3. DEPENDENCY INDEX
+
+Create a persistent dependency graph.
+
+Capture at minimum:
+
+- project → project
+- file → file
+- symbol → symbol where practical
+- class → interface
+- class → base class
+- symbol → referenced symbol
+
+For .NET specifically detect:
+
+- .sln / .slnx
+- .csproj
+- ProjectReference
+- PackageReference
+- using relationships where useful
+- inheritance
+- interface implementation
+- common dependency-injection registration patterns
+
+Do not attempt to perfectly model the entire C# compiler.
+
+4. INCREMENTAL INDEXING
+
+This is critical.
+
+Do NOT scan and parse every file every time.
+
+On subsequent runs:
+
+1. enumerate files
+2. apply ignore rules
+3. compare metadata/hash
+4. identify added files
+5. identify modified files
+6. identify deleted files
+7. reparse only changed files
+8. update affected dependency relationships
+9. persist the updated index
+
+The first index can be slower.
+
+Subsequent indexing should be substantially faster.
+
+5. CACHE FORMAT
+
+Use a versioned schema.
+
+Example:
+
+{
+  "schemaVersion": 1,
+  "repositoryRoot": "...",
+  "createdAt": "...",
+  "updatedAt": "...",
+  "files": {},
+  "symbols": {},
+  "dependencies": {}
+}
+
+Do not couple the persisted format directly to internal TypeScript classes.
+
+6. CACHE LOCATION
+
+Continue using:
+
+.contextpilot/
+
+Keep it gitignored by default.
+
+Do not store:
+- source code
+- secrets
+- environment variables
+- credentials
+
+in the persistent index.
+
+7. SECURITY
+
+Retain the Phase 1 security behavior.
+
+Never index by default:
+
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+credentials.json
+secrets.json
+node_modules
+bin
+obj
+.git
+
+Make ignore patterns configurable.
+
+Also support .gitignore semantics where practical.
+
+8. REPOSITORY CHANGE DETECTION
+
+Create an abstraction such as:
+
+RepositoryIndexer
+
+with operations similar to:
+
+index()
+update()
+rebuild()
+getStatus()
+
+Do not expose implementation details through the MCP layer.
+
+9. INDEX STATUS
+
+Add an internal capability that can report:
+
+- indexed/not indexed
+- last index time
+- number of files
+- number of symbols
+- number of dependencies
+- number of changed files
+- index schema version
+
+10. MCP TOOL
+
+Add:
+
+index_repository
+
+Input:
+
+{
+  "path": ".",
+  "force": false
+}
+
+Return something like:
+
+{
+  "status": "updated",
+  "addedFiles": 3,
+  "modifiedFiles": 5,
+  "deletedFiles": 1,
+  "filesIndexed": 421,
+  "symbolsIndexed": 18291,
+  "dependenciesIndexed": 39482,
+  "durationMs": 1234
+}
+
+Also support:
+
+force=true
+
+which performs a clean rebuild.
+
+11. UPDATE PHASE 1 TOOLS
+
+Modify:
+
+analyze_repository
+search_code
+find_symbol
+estimate_tokens
+
+to use the persistent index where beneficial.
+
+Do NOT break their existing behavior.
+
+12. TESTING
+
+Add tests for:
+
+- initial indexing
+- unchanged repository
+- modified file
+- added file
+- deleted file
+- hash changes
+- ignored files
+- secret-file exclusion
+- symbol extraction
+- dependency extraction
+- corrupted index recovery
+- schema version mismatch
+- force rebuild
+- empty repository
+- large number of files
+- Windows paths
+- Unix paths
+
+Since this is intended for our enterprise development team, Windows support is important.
+
+13. PERFORMANCE
+
+Measure indexing performance.
+
+Do not make unsupported performance claims.
+
+Add a benchmark or test fixture demonstrating:
+
+first index
+
+versus
+
+incremental index with only a few changed files.
+
+14. FAILURE BEHAVIOR
+
+If the index is corrupt:
+
+- do not crash the MCP server
+- report the problem
+- rebuild safely when possible
+
+If indexing fails for one file:
+
+- do not necessarily fail the entire repository index
+- record the failure
+- continue processing other files
+- expose indexing warnings
+
+15. LOGGING
+
+Do not log source contents.
+
+Do not log secrets.
+
+Support verbose diagnostics.
+
+16. DOCUMENTATION
+
+Update:
+
+README.md
+docs/architecture.md
+docs/configuration.md
+docs/mcp-tools.md
+
+Document:
+
+- index architecture
+- cache format
+- incremental indexing
+- security model
+- rebuild behavior
+- limitations
+
+17. IMPORTANT ARCHITECTURAL CONSTRAINT
+
+Do NOT implement context ranking yet.
+
+Do NOT implement optimize_context yet.
+
+Do NOT implement the Claude Code plugin yet.
+
+Do NOT implement Git intelligence yet.
+
+Those belong to later phases.
+
+Phase 2 should produce a high-quality repository intelligence layer that those future components can depend on.
+
+18. ACCEPTANCE CRITERIA
+
+Phase 2 is complete only when:
+
+[ ] Initial repository indexing works
+[ ] Persistent index works
+[ ] Incremental indexing works
+[ ] Added files detected
+[ ] Modified files detected
+[ ] Deleted files detected
+[ ] Hash-based change detection works
+[ ] File index works
+[ ] Symbol index works
+[ ] Dependency index works
+[ ] C# support works
+[ ] TypeScript/JavaScript support remains functional
+[ ] Security exclusions remain enforced
+[ ] Windows paths work
+[ ] Corrupt indexes recover safely
+[ ] MCP server remains stable
+[ ] Phase 1 tests still pass
+[ ] Phase 2 tests pass
+[ ] Documentation updated
+[ ] No source code leaves the machine
+
+After implementation:
+
+1. Run npm build
+2. Run the complete test suite
+3. Run the indexing tests
+4. Run an initial index against the existing sample .NET repository
+5. Modify one or two files
+6. Run incremental indexing
+7. Demonstrate that only the changed/affected portions are reparsed
+8. Run the full test suite again
+9. Report the results
+
+Do not proceed to Phase 3.
+
+Stop after Phase 2 and wait for further instructions.
