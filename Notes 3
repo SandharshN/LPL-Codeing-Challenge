@@ -1,0 +1,1126 @@
+Phase 2 is complete and verified.
+
+Proceed to Phase 3 of ContextPilot.
+
+Phase 3 goal:
+
+Build the ContextPilot context-ranking and context-optimization engine.
+
+This is the core intelligence layer of the product.
+
+The objective is NOT simply to find files matching keywords.
+
+The objective is:
+
+> Given a developer task and a repository, determine the smallest set of repository context that is sufficient for an AI coding agent to understand and safely implement the task.
+
+The system must optimize for token efficiency while protecting correctness.
+
+Do NOT implement the Claude Code plugin yet.
+
+Do NOT implement Git intelligence yet.
+
+Do NOT implement external LLM/embedding APIs.
+
+Everything in this phase must remain local and deterministic.
+
+---
+
+# 1. CORE CONCEPT
+
+Given:
+
+Task:
+
+"Add retry handling to the payment API"
+
+ContextPilot should analyze the repository index and produce something like:
+
+Selected:
+
+1. PaymentController.cs
+2. PaymentService.cs
+3. IPaymentService.cs
+4. PaymentRepository.cs
+5. PaymentServiceTests.cs
+6. PaymentOptions.cs
+
+Potentially relevant:
+
+7. Program.cs
+
+Excluded:
+
+- CustomerService.cs
+- ReportingService.cs
+- EmailService.cs
+- unrelated tests
+- unrelated configuration
+
+The result must include WHY each file was selected.
+
+---
+
+# 2. NEW COMPONENTS
+
+Create:
+
+src/ranking/
+
+    relevance-scorer.ts
+    context-ranker.ts
+    dependency-expander.ts
+    context-selector.ts
+    token-budget.ts
+    ranking-types.ts
+
+The architecture should be:
+
+Repository Index
+       │
+       ▼
+Task Analyzer
+       │
+       ▼
+Candidate Generator
+       │
+       ▼
+Relevance Scorer
+       │
+       ▼
+Dependency Expansion
+       │
+       ▼
+Context Selector
+       │
+       ▼
+Token Budget
+       │
+       ▼
+Optimized Context
+
+Keep these components independently testable.
+
+---
+
+# 3. INPUT
+
+The primary API should accept:
+
+{
+  "task": "Add retry handling to the payment API",
+  "path": ".",
+  "maxFiles": 20,
+  "maxTokens": 30000
+}
+
+All optional limits must have sensible defaults.
+
+---
+
+# 4. TASK ANALYSIS
+
+Create a lightweight task analyzer.
+
+Extract:
+
+- meaningful keywords
+- probable entities
+- probable actions
+- probable technologies
+- probable domain concepts
+- probable files
+- probable symbols
+
+For example:
+
+Task:
+
+"Add retry handling to the PaymentService when calling the external payment provider"
+
+Potential concepts:
+
+payment
+PaymentService
+retry
+external provider
+
+Potential action:
+
+modify
+
+Potential dependency:
+
+external HTTP/API call
+
+Do NOT use an LLM for this.
+
+Use deterministic heuristics initially.
+
+Create a clean abstraction so an LLM/embedding-based analyzer could potentially be added later.
+
+---
+
+# 5. CANDIDATE GENERATION
+
+Generate candidate files using multiple signals.
+
+Candidate sources:
+
+1. filename
+2. path
+3. symbols
+4. symbol references
+5. dependency graph
+6. project relationship
+7. test relationship
+8. configuration relationship
+9. architecture
+10. imports/usings
+11. inheritance
+12. interface implementation
+
+Do NOT rely on one signal.
+
+---
+
+# 6. RELEVANCE SCORING
+
+Implement a transparent scoring system.
+
+Initial weights:
+
+semantic relevance             0.30
+symbol relevance               0.20
+dependency relevance           0.15
+reference relevance            0.10
+test relevance                 0.10
+configuration relevance       0.05
+architecture relevance        0.05
+project relevance              0.05
+
+Total = 1.00
+
+Make these configurable.
+
+The scorer should return both:
+
+score
+
+and
+
+reasons
+
+Example:
+
+{
+  "path": "PaymentService.cs",
+  "score": 0.94,
+  "reasons": [
+    "Task mentions payment",
+    "Contains PaymentService",
+    "Called by PaymentController",
+    "Contains external provider call"
+  ]
+}
+
+Do not expose a score without explaining the major contributing signals.
+
+---
+
+# 7. IMPORTANT: DO NOT CONFUSE RELEVANCE WITH NECESSITY
+
+A file can be highly related but unnecessary.
+
+For example:
+
+PaymentService.cs
+PaymentController.cs
+PaymentRepository.cs
+
+may all be highly relevant.
+
+But if the requested change only affects PaymentService retry behavior around an HTTP call, PaymentRepository may not actually be required.
+
+Therefore introduce two concepts:
+
+RELEVANCE
+
+and
+
+CONTEXT NECESSITY
+
+The final selector should consider both.
+
+---
+
+# 8. DEPENDENCY EXPANSION
+
+Starting from highly relevant symbols/files, traverse the dependency graph.
+
+Support:
+
+- direct dependency
+- reverse dependency
+- interface
+- implementation
+- inheritance
+- caller
+- callee
+- project reference
+
+Allow configurable depth.
+
+Example:
+
+depth 0:
+
+PaymentService
+
+depth 1:
+
+IPaymentService
+PaymentController
+PaymentRepository
+ExternalPaymentClient
+
+depth 2:
+
+PaymentServiceTests
+PaymentClientOptions
+
+Do not blindly include everything reachable.
+
+---
+
+# 9. ARCHITECTURE AWARENESS
+
+Use Phase 2 repository metadata.
+
+For .NET recognize common patterns:
+
+Controller
+Service
+Repository
+DbContext
+Middleware
+Validator
+DTO
+Options
+Configuration
+Client
+Handler
+Worker
+HostedService
+
+Architecture is a relevance signal, NOT an absolute rule.
+
+For example:
+
+If changing:
+
+PaymentController
+
+the system should consider:
+
+PaymentController
+PaymentService
+IPaymentService
+relevant DTO
+relevant validator
+relevant tests
+
+But should NOT automatically include every repository in the application.
+
+---
+
+# 10. TEST DISCOVERY
+
+Tests should receive special treatment.
+
+Given:
+
+PaymentService.cs
+
+identify:
+
+PaymentServiceTests.cs
+
+and tests referencing PaymentService.
+
+Tests should generally receive a relevance boost.
+
+However, don't include every test in the project.
+
+---
+
+# 11. CONFIGURATION DISCOVERY
+
+Detect configuration relevant to the task.
+
+For example:
+
+Task:
+
+"Increase timeout for the external payment API"
+
+Potential relevant files:
+
+PaymentClient.cs
+PaymentOptions.cs
+appsettings.json
+appsettings.Production.json
+
+But:
+
+unrelated logging configuration
+
+should not be included.
+
+Configuration should be selected based on relationships, names and references.
+
+---
+
+# 12. TOKEN BUDGET
+
+Implement:
+
+TokenBudget
+
+Input:
+
+maxTokens
+
+Each candidate has:
+
+estimatedTokens
+
+The selector should maximize useful context under the budget.
+
+This is essentially a constrained selection problem.
+
+Do NOT simply take the top N files.
+
+Example:
+
+File A:
+score .95
+tokens 20,000
+
+File B:
+score .90
+tokens 4,000
+
+File C:
+score .87
+tokens 3,000
+
+File D:
+score .82
+tokens 2,000
+
+With a 10,000-token budget:
+
+A should NOT automatically win.
+
+The system should select B + C + D if their combined context provides greater useful coverage.
+
+Document the algorithm.
+
+A greedy value-per-token approach is acceptable for the first implementation.
+
+---
+
+# 13. CONTEXT COVERAGE
+
+Introduce the concept of coverage.
+
+A selected file should cover one or more task requirements.
+
+Example:
+
+Task requirements:
+
+[authentication]
+[token validation]
+[authorization]
+[tests]
+
+A context set should ideally cover all four.
+
+Do not select five files that all cover the same concept while leaving another important concept uncovered.
+
+Implement something like:
+
+coverageScore
+
+for the selected context.
+
+---
+
+# 14. REDUNDANCY
+
+Detect redundant context.
+
+Example:
+
+Three files all provide nearly identical utility functionality.
+
+Prefer the smallest useful set.
+
+The system should penalize redundancy.
+
+Possible formula:
+
+finalValue =
+    relevance
+  + coverage
+  + architecturalImportance
+  - redundancy
+  - tokenCostPenalty
+
+Document the exact implementation.
+
+Keep it deterministic.
+
+---
+
+# 15. SAFETY OVERRIDES
+
+Token efficiency must NEVER remove critical context.
+
+Implement safety categories.
+
+High-priority context:
+
+- authentication
+- authorization
+- security middleware
+- input validation
+- database migrations
+- transactions
+- concurrency
+- exception handling
+- configuration affecting behavior
+- tests directly covering changed behavior
+
+If a task involves these areas, apply stronger inclusion rules.
+
+Example:
+
+Task:
+
+"Fix JWT authentication"
+
+Do not optimize away:
+
+TokenValidator
+Authentication configuration
+Authorization policy
+Authentication middleware
+security tests
+
+even if they are slightly lower ranked.
+
+---
+
+# 16. UNKNOWN / AMBIGUOUS TASKS
+
+If ContextPilot cannot confidently identify relevant context, it should say so.
+
+Example:
+
+{
+  "confidence": 0.42,
+  "warning": "Task is ambiguous; broader context recommended."
+}
+
+When confidence is low:
+
+- expand candidate search
+- increase context conservatism
+- avoid aggressive token reduction
+
+Never pretend to know something the index cannot establish.
+
+---
+
+# 17. CONTEXT LEVELS
+
+Implement three context levels.
+
+## focused
+
+Smallest likely sufficient context.
+
+Optimize aggressively.
+
+## balanced
+
+Recommended default.
+
+Balance context and completeness.
+
+## comprehensive
+
+Include broader dependencies and tests.
+
+Prefer completeness over token savings.
+
+Input:
+
+{
+  "mode": "balanced"
+}
+
+Default:
+
+balanced
+
+---
+
+# 18. OPTIMIZE_CONTEXT MCP TOOL
+
+Implement:
+
+optimize_context
+
+Input:
+
+{
+  "task": "Add retry handling to the payment API",
+  "path": ".",
+  "maxFiles": 20,
+  "maxTokens": 30000,
+  "mode": "balanced"
+}
+
+Return:
+
+{
+  "task": "...",
+
+  "confidence": 0.91,
+
+  "mode": "balanced",
+
+  "selectedFiles": [
+    {
+      "path": "PaymentService.cs",
+      "score": 0.96,
+      "estimatedTokens": 4200,
+      "reasons": [],
+      "coverage": []
+    }
+  ],
+
+  "excludedFiles": [
+    {
+      "path": "CustomerService.cs",
+      "score": 0.12,
+      "reason": "No meaningful dependency or task relationship"
+    }
+  ],
+
+  "coverage": [
+    "payment processing",
+    "external API call",
+    "retry behavior",
+    "unit tests"
+  ],
+
+  "estimatedTokens": 12500,
+
+  "estimatedRepositoryTokens": 1800000,
+
+  "estimatedReduction": 99.3,
+
+  "warnings": []
+}
+
+IMPORTANT:
+
+The reduction percentage must be clearly labelled as an ESTIMATE.
+
+Do not claim actual Claude token savings.
+
+This is context selection estimation, not provider billing data.
+
+---
+
+# 19. FIND_RELEVANT_FILES MCP TOOL
+
+Implement:
+
+find_relevant_files
+
+Input:
+
+{
+  "task": "...",
+  "path": ".",
+  "maxFiles": 20,
+  "mode": "balanced"
+}
+
+Return ranked candidates.
+
+This tool should be faster and simpler than optimize_context.
+
+---
+
+# 20. EXPLAINABILITY
+
+Implement enough information to answer:
+
+"Why did you select this file?"
+
+Every selected file should have:
+
+- score
+- top signals
+- dependency path
+- symbols involved
+- task concepts matched
+
+Example:
+
+PaymentService.cs
+
+Score: 0.94
+
+Why:
+
+- Task references payment processing
+- Contains PaymentService
+- Called by PaymentController
+- Calls external payment client
+- Covered by PaymentServiceTests
+
+Dependency path:
+
+PaymentController
+ → PaymentService
+ → ExternalPaymentClient
+
+---
+
+# 21. MCP TOOL: explain_context
+
+Add:
+
+explain_context
+
+Input:
+
+{
+  "task": "...",
+  "path": "."
+}
+
+Return a human-readable explanation of:
+
+- what was selected
+- what was excluded
+- why
+- confidence
+- token budget
+- tradeoffs
+
+This will eventually power:
+
+/contextpilot-explain
+
+but do not implement the Claude slash command yet.
+
+---
+
+# 22. CLI
+
+Extend the CLI:
+
+contextpilot relevant "Add retry handling to payments"
+
+contextpilot optimize "Add retry handling to payments"
+
+contextpilot explain "Add retry handling to payments"
+
+Support:
+
+--max-files
+
+--max-tokens
+
+--mode focused
+
+--mode balanced
+
+--mode comprehensive
+
+--json
+
+---
+
+# 23. TESTING
+
+Create extensive deterministic tests.
+
+At minimum test:
+
+1. Simple single-file task
+2. Controller/service task
+3. Service/repository task
+4. Interface implementation
+5. Cross-project task
+6. Configuration task
+7. Authentication task
+8. Database task
+9. Test-only task
+10. Ambiguous task
+11. Large token budget
+12. Small token budget
+13. Zero/very small budget
+14. Redundant candidates
+15. Dependency depth
+16. Missing index
+17. Stale index
+18. Unknown symbol
+19. Unknown task
+20. Security-sensitive task
+
+---
+
+# 24. GOLDEN TESTS
+
+Use the existing Phase 2 fixtures.
+
+Create expected context sets.
+
+Example:
+
+Task:
+
+"Add retry handling to PaymentService"
+
+Expected top context:
+
+PaymentService.cs
+IPaymentService.cs
+PaymentServiceTests.cs
+ExternalPaymentClient.cs
+
+Expected NOT to be selected:
+
+CustomerService.cs
+ReportingService.cs
+EmailService.cs
+
+Do not require an exact ranking if multiple files are equally valid.
+
+Test using:
+
+- required files
+- forbidden/unnecessary files
+- coverage
+- token budget
+
+rather than brittle exact ordering.
+
+---
+
+# 25. EVALUATION METRICS
+
+Create deterministic evaluation metrics:
+
+Precision:
+
+relevant selected files /
+all selected files
+
+Recall:
+
+relevant selected files /
+all expected relevant files
+
+Coverage:
+
+percentage of task requirements covered
+
+Token reduction estimate:
+
+1 - selectedTokens / repositoryTokens
+
+Also measure:
+
+average files selected
+average files excluded
+average estimated context size
+
+Do not claim these metrics represent actual Claude performance.
+
+They measure ContextPilot's selection behavior.
+
+---
+
+# 26. FAILURE MODES
+
+Explicitly handle:
+
+- no index
+- empty repository
+- corrupted index
+- task has no useful keywords
+- no candidates
+- token budget too small
+- parser failures
+- dependency graph incomplete
+
+When uncertain:
+
+prefer broader context.
+
+---
+
+# 27. PERFORMANCE
+
+Context ranking should NOT re-index the repository.
+
+It should operate primarily on the persistent Phase 2 index.
+
+The expected flow:
+
+Repository
+   ↓
+Phase 2 Index
+   ↓
+Task
+   ↓
+Phase 3 Ranking
+
+Do not parse every source file for every query.
+
+If source inspection is required, keep it targeted.
+
+---
+
+# 28. NO LLM DEPENDENCY
+
+Phase 3 must work without:
+
+- Anthropic API
+- OpenAI API
+- embeddings API
+- internet access
+
+This makes the system:
+
+- private
+- deterministic
+- fast
+- testable
+- enterprise-friendly
+
+Design interfaces so semantic embeddings could be added later, but do not implement them now.
+
+---
+
+# 29. IMPORTANT: DO NOT OVERCLAIM
+
+README and CLI output must NOT say:
+
+"ContextPilot saves 65% of Claude tokens"
+
+unless actual Claude usage has been measured.
+
+Instead say:
+
+"ContextPilot selected an estimated 35,000 tokens instead of an estimated 100,000-token repository context."
+
+Later benchmarking can compare actual Claude usage.
+
+---
+
+# 30. EXAMPLE
+
+For this repository:
+
+Payment API:
+
+Controller
+   ↓
+PaymentService
+   ↓
+IPaymentRepository
+   ↓
+PaymentRepository
+   ↓
+DbContext
+
+Tests:
+
+PaymentServiceTests
+
+Configuration:
+
+PaymentOptions
+
+Task:
+
+"Add retry handling to the external payment provider call."
+
+The system should ideally identify:
+
+HIGH:
+
+PaymentService
+ExternalPaymentClient
+PaymentServiceTests
+
+MEDIUM:
+
+IPaymentService
+PaymentOptions
+
+LOW:
+
+PaymentRepository
+DbContext
+
+NONE:
+
+CustomerService
+ReportingService
+EmailService
+
+Do not hard-code these names.
+
+The ranking engine must discover the relationships.
+
+---
+
+# 31. DESIGN FOR FUTURE PHASES
+
+Phase 4 will add the Claude Code plugin.
+
+Phase 5 will add Git intelligence.
+
+Future versions may add:
+
+- embeddings
+- learned ranking
+- organization-specific ranking
+- Jira integration
+- GitHub integration
+- Splunk integration
+- production incident context
+- code ownership
+- architectural documentation
+- PR context
+
+Do not implement these now.
+
+Keep interfaces extensible.
+
+---
+
+# 32. BACKWARD COMPATIBILITY
+
+All Phase 1 and Phase 2 functionality must continue working.
+
+Run the entire test suite.
+
+Do not break:
+
+- analyze_repository
+- search_code
+- find_symbol
+- estimate_tokens
+- index_repository
+
+---
+
+# 33. ACCEPTANCE CRITERIA
+
+Phase 3 is complete only when:
+
+[ ] Task analyzer implemented
+[ ] Candidate generation implemented
+[ ] Relevance scoring implemented
+[ ] Dependency expansion implemented
+[ ] Context necessity implemented
+[ ] Token budget implemented
+[ ] Coverage implemented
+[ ] Redundancy handling implemented
+[ ] Security overrides implemented
+[ ] focused mode works
+[ ] balanced mode works
+[ ] comprehensive mode works
+[ ] find_relevant_files works
+[ ] optimize_context works
+[ ] explain_context works
+[ ] CLI commands work
+[ ] JSON output works
+[ ] deterministic tests pass
+[ ] golden tests pass
+[ ] evaluation metrics work
+[ ] Phase 1 tests still pass
+[ ] Phase 2 tests still pass
+[ ] no external AI/API dependency
+[ ] no source code leaves machine
+[ ] documentation updated
+[ ] no unsupported token-saving claims
+
+---
+
+# 34. FINAL VALIDATION
+
+After implementation:
+
+1. Build the project.
+2. Run all tests.
+3. Run the golden tests.
+4. Run the CLI against the sample .NET repository.
+5. Run:
+
+contextpilot relevant "Add retry handling to the payment API"
+
+6. Run:
+
+contextpilot optimize "Add retry handling to the payment API"
+
+7. Run with:
+
+--mode focused
+
+--mode balanced
+
+--mode comprehensive
+
+8. Demonstrate the differences.
+9. Run:
+
+contextpilot explain "Add retry handling to the payment API"
+
+10. Show estimated repository tokens versus selected tokens.
+11. Verify no network calls are made.
+12. Verify security exclusions remain enforced.
+13. Report precision, recall and coverage for the golden tests.
+14. Run the complete test suite again.
+
+Do NOT proceed to Phase 4.
+
+Stop after Phase 3 and report:
+
+- files created/changed
+- architecture
+- algorithms used
+- test count
+- test results
+- example ranking
+- example token reduction estimate
+- precision
+- recall
+- coverage
+- known limitations
+
+Wait for further instructions.
