@@ -1,0 +1,305 @@
+Yes — before you give Copilot/Claude the real-world task, I would do a small setup/verification step.
+
+You do NOT need to manually feed all 20 repos into Claude's context.
+
+The important thing is that ContextPilot itself can see/index those 20 repos and that Copilot can invoke its MCP tools.
+
+Your workspace should look roughly like:
+
+my-workspace/
+│
+├── repo-1/
+├── repo-2/
+├── repo-3/
+├── ...
+├── repo-20/
+│
+└── contextpilot/
+    ├── src/
+    ├── package.json
+    └── ...
+
+
+1. FIRST — MAKE SURE CONTEXTPILOT IS HEALTHY
+
+From the contextpilot directory:
+
+npm install
+npm test
+npm run build
+
+You already had 24/24 tests passing in Phase 1, so after Phase 3, just make sure the tests/build still pass.
+
+Then test the MCP server itself, if the project has the expected script:
+
+npm run start
+
+or whatever package.json defines for the MCP server.
+
+Don't leave a terminal window running it manually if you've configured VS Code to start it. VS Code can manage/start MCP servers for you.
+
+
+2. CONNECT CONTEXTPILOT TO COPILOT
+
+Since you're using GitHub Copilot + Claude inside VS Code, you want Copilot Agent to see ContextPilot's MCP tools.
+
+Create:
+
+my-workspace/
+└── .vscode/
+    └── mcp.json
+
+Something along these lines:
+
+{
+  "servers": {
+    "contextpilot": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/contextpilot/dist/mcp/server.js"
+      ]
+    }
+  }
+}
+
+IMPORTANT:
+The exact path/command should match what Claude built in Phase 1–3.
+
+Don't blindly use dist/mcp/server.js if the actual build output is different.
+
+
+3. VERIFY COPILOT ACTUALLY SEES CONTEXTPILOT
+
+Open VS Code:
+
+Copilot Chat → Agent mode → Configure Tools
+
+You should see something similar to:
+
+MCP Servers
+  contextpilot
+      analyze_repository
+      index_repository
+      search_code
+      find_symbol
+      dependency_graph
+      find_relevant_files
+      optimize_context
+      estimate_tokens
+      ...
+
+The exact list depends on what you've implemented so far.
+
+If you see those tools, you're ready.
+
+
+4. DO NOT TELL CLAUDE TO READ ALL 20 REPOS
+
+This is the key distinction.
+
+Don't give Copilot a prompt like:
+
+"Read all 20 repositories so you understand the workspace."
+
+That defeats the entire purpose of ContextPilot.
+
+Instead, ContextPilot should have access to:
+
+20 repositories
+      ↓
+Workspace discovery
+      ↓
+Repository indexes
+      ↓
+Workspace Graph
+      ↓
+Relevant repositories
+      ↓
+Relevant projects
+      ↓
+Relevant files
+      ↓
+Relevant symbols
+      ↓
+Minimum sufficient context
+
+So Claude's actual context might eventually look like:
+
+Task:
+"Add X to the retirement distribution API"
+
+ContextPilot determines:
+
+Repositories:
+  repo-4
+  repo-7
+  repo-12
+
+Projects:
+  Distribution.Api
+  Distribution.Core
+  Customer.Client
+
+Files:
+  DistributionController.cs
+  DistributionService.cs
+  DistributionResponse.cs
+  CustomerClient.cs
+  DistributionServiceTests.cs
+
+Symbols:
+  DistributionService
+  DistributionResponse
+  ICustomerClient
+
+Instead of Claude independently exploring:
+
+20 repos
+→ 300 projects
+→ 8,000 files
+→ thousands of irrelevant files
+
+That's the experiment we actually want to test.
+
+
+5. DO ONE TEST BEFORE GIVING IT THE REAL TASK
+
+Don't give it your actual business task yet.
+
+Give Copilot/Claude this:
+
+"ContextPilot validation test
+
+You have access to the entire workspace, which contains approximately 20 repositories.
+
+Do not modify any files.
+
+Use ContextPilot to index/discover the workspace and determine:
+
+1. How many repositories are present.
+2. What projects exist in each repository.
+3. Which repositories appear to have relationships/dependencies with each other.
+4. Show me how ContextPilot determines relevant repositories/files.
+5. Pick one representative repository and demonstrate find_relevant_files and optimize_context.
+6. Report the estimated token count before and after optimization.
+
+Do not solve or implement any business task yet.
+
+The purpose of this exercise is to validate ContextPilot's workspace discovery, indexing, ranking, dependency analysis, and context optimization.
+
+Do not load the entire source code of all repositories into the conversation. Use ContextPilot's tools to progressively narrow the context."
+
+What you want to see is something like:
+
+Workspace
+  ├── 20 repositories discovered
+  │
+  ├── repo-A
+  │     ├── 5 projects
+  │     └── 214 files
+  │
+  ├── repo-B
+  │     ├── 3 projects
+  │     └── 147 files
+  │
+  ...
+
+ContextPilot selected:
+
+Repositories:
+  repo-A
+  repo-F
+
+Files:
+  11 selected
+  37 excluded
+
+Estimated context:
+  Before: ~48,000 tokens
+  After:  ~9,500 tokens
+
+Reduction: ~80% estimated
+
+The important word is "estimated."
+
+Don't claim that this is actual Claude token/billing reduction yet.
+
+
+6. ONE MORE THING I'D CHANGE BEFORE THE REAL-WORLD TEST
+
+Because you have 20 repos, I would tell Claude to treat the workspace as a workspace-level ContextPilot environment, not just 20 independent repositories.
+
+Give Claude this instruction before the validation test:
+
+"The workspace contains approximately 20 related repositories. ContextPilot must treat the workspace as a multi-repository environment.
+
+Do not assume repositories are independent.
+
+Discover cross-repository relationships through solution/project references, NuGet/package dependencies, namespaces, imports, configuration, Git metadata, APIs, and other locally available signals.
+
+Maintain repository-level indexes as well as workspace-level relationships.
+
+When analyzing a task, first identify potentially relevant repositories, then narrow to projects, files, symbols, dependencies, tests, and configuration.
+
+Never load all repository source code simply because it is available.
+
+Optimize for minimum sufficient context rather than maximum available context.
+
+Do not modify any of the 20 existing repositories during this validation.
+
+ContextPilot itself may be modified as necessary."
+
+
+7. THE SEQUENCE I RECOMMEND
+
+Right now:
+
+1. Finish Phase 3
+        ↓
+2. npm test / npm build
+        ↓
+3. Configure ContextPilot MCP in VS Code
+        ↓
+4. Verify tools appear in Copilot Agent
+        ↓
+5. Give Claude the validation prompt
+        ↓
+6. Inspect results
+        ↓
+7. Fix anything wrong
+        ↓
+8. THEN give it your real-world task
+
+And importantly, you don't need to manually run ContextPilot every time once MCP is configured.
+
+VS Code can start/manage the local MCP server.
+
+The goal is:
+
+Copilot Agent
+      ↓
+ContextPilot MCP
+      ↓
+Workspace Index
+      ↓
+20 repositories
+      ↓
+Ranking / Dependency Analysis
+      ↓
+Minimum sufficient context
+      ↓
+Claude
+
+
+So the short answer is:
+
+NO — you should not manually run ContextPilot and paste its results into Claude.
+
+YES — you should make sure ContextPilot builds/tests successfully and is configured as an MCP server in your VS Code workspace.
+
+YES — you should verify Copilot can see the ContextPilot tools.
+
+YES — run one read-only validation test against your 20-repo workspace before giving Claude the real business task.
+
+That validation will tell us whether ContextPilot is actually selecting the right context before we use it on a real development task.
