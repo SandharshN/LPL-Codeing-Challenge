@@ -1,0 +1,481 @@
+CONTEXTPILOT — PHASE 3 REAL-WORLD VALIDATION
+
+Before we proceed to Phase 4, I want to validate that the current ContextPilot implementation actually works well against my real VS Code workspace.
+
+The workspace contains approximately 20 repositories.
+
+This is a READ-ONLY evaluation.
+
+DO NOT modify any of the existing application repositories.
+
+You may modify ContextPilot itself only if a bug must be fixed, but first report the problem and prefer not to change implementation during the evaluation.
+
+============================================================
+GOAL
+============================================================
+
+I want to determine whether ContextPilot can correctly identify the minimum sufficient context required for a real software development task across a multi-repository workspace.
+
+Do NOT simply measure how many files or tokens ContextPilot removes.
+
+The primary question is:
+
+"Did ContextPilot select the files, projects, repositories, symbols, dependencies, and tests that a developer would actually need to complete the task?"
+
+Avoid both:
+
+1. UNDER-CONTEXT:
+   Important files are missing.
+
+2. OVER-CONTEXT:
+   Large amounts of irrelevant code are selected.
+
+============================================================
+TEST 1 — WORKSPACE DISCOVERY
+============================================================
+
+First, use ContextPilot to inspect the workspace.
+
+Report:
+
+- Number of repositories discovered
+- Repository names
+- Languages
+- Solutions
+- Projects
+- Test projects
+- Major project-to-project relationships
+- Cross-repository dependencies discovered
+
+Do NOT read the entire source code of all repositories.
+
+Use ContextPilot's indexing and discovery capabilities.
+
+Report anything that appears to be missing or incorrectly classified.
+
+============================================================
+TEST 2 — SIMPLE SINGLE-REPOSITORY TASK
+============================================================
+
+Choose one repository and create a realistic but relatively simple development task based on code that actually exists in that repository.
+
+Example:
+
+"Add a new validation rule to an existing API request."
+
+Do NOT implement the task.
+
+Instead, ask ContextPilot:
+
+"What context would be required to implement this task?"
+
+Report:
+
+- Relevant repository
+- Relevant project
+- Candidate files
+- Selected files
+- Excluded files
+- Relevant symbols
+- Dependencies expanded
+- Relevant tests
+- Estimated tokens
+- Reasons for each important selection
+
+Then manually sanity-check the result.
+
+Specifically identify:
+
+- files that should have been selected but were missed
+- files selected unnecessarily
+- dependencies that should have been expanded
+- dependencies that should NOT have been expanded
+
+============================================================
+TEST 3 — MULTI-REPOSITORY TASK
+============================================================
+
+Now choose a realistic task that requires understanding more than one repository.
+
+For example:
+
+"Change an API response contract and determine what downstream consumers would be affected."
+
+Use relationships that actually exist in the workspace.
+
+Do NOT invent relationships.
+
+Ask ContextPilot to determine:
+
+1. Which repositories are relevant?
+2. Which projects are relevant?
+3. Which API/contract files are relevant?
+4. Which consumers are relevant?
+5. Which interfaces/models/symbols are relevant?
+6. Which tests are relevant?
+7. Which configuration is relevant?
+8. Which dependencies need to be inspected?
+
+Report the complete reasoning.
+
+============================================================
+TEST 4 — .NET ARCHITECTURE TASK
+============================================================
+
+Choose a realistic .NET task from one of the repositories.
+
+Example:
+
+"Modify how a distribution transaction is persisted."
+
+Do NOT implement it.
+
+Determine whether ContextPilot can discover an architecture chain such as:
+
+Controller/API
+    ↓
+Service
+    ↓
+Repository
+    ↓
+DbContext
+    ↓
+Database model/entity
+
+Also identify:
+
+- interfaces
+- dependency injection registrations
+- DTOs
+- validators
+- configuration
+- relevant tests
+
+The exact architecture will depend on the repository.
+
+Do not assume these layers exist.
+
+The important thing is whether ContextPilot can discover the actual architecture from the code.
+
+============================================================
+TEST 5 — CHANGE IMPACT ANALYSIS
+============================================================
+
+Choose an existing class/interface/model that has multiple consumers.
+
+Ask:
+
+"If I change this symbol, what could be affected?"
+
+Use ContextPilot to identify:
+
+- direct references
+- implementations
+- derived types
+- callers
+- dependent projects
+- dependent repositories
+- relevant tests
+
+Report the dependency chain.
+
+This is an important test because context selection should understand impact, not just keyword matching.
+
+============================================================
+TEST 6 — NEGATIVE / DISTRACTOR TEST
+============================================================
+
+Choose a task where the workspace contains many similarly named files.
+
+Example:
+
+"Modify Payment validation."
+
+There may be:
+
+- PaymentController
+- PaymentService
+- PaymentRepository
+- PaymentValidator
+- PaymentHistory
+- PaymentReport
+- PaymentClient
+- unrelated Payment classes in another repository
+
+Test whether ContextPilot can distinguish relevant from irrelevant files.
+
+This is especially important.
+
+A good context engine should NOT select every file containing the word "Payment."
+
+============================================================
+TEST 7 — TEST DISCOVERY
+============================================================
+
+For one realistic development task, determine whether ContextPilot automatically finds the appropriate tests.
+
+For example:
+
+If the selected production code is:
+
+DistributionService.cs
+
+does it find something like:
+
+DistributionServiceTests.cs
+
+or the actual equivalent in the repository?
+
+Also determine whether it can distinguish:
+
+- directly relevant tests
+- indirectly relevant tests
+- unrelated tests
+
+============================================================
+TEST 8 — CONFIGURATION DISCOVERY
+============================================================
+
+Choose a task where configuration could affect behavior.
+
+Examples:
+
+- feature flag
+- appsettings
+- environment configuration
+- dependency injection
+- external API configuration
+- database configuration
+
+Determine whether ContextPilot recognizes relevant configuration files as context when appropriate.
+
+It should NOT automatically include every configuration file.
+
+============================================================
+TEST 9 — TOKEN OPTIMIZATION
+============================================================
+
+For at least two of the above tasks, compare:
+
+A. Broad candidate context
+
+versus
+
+B. ContextPilot optimized context
+
+Report:
+
+Candidate files:
+X
+
+Selected files:
+Y
+
+Excluded files:
+Z
+
+Estimated tokens before:
+X
+
+Estimated tokens after:
+Y
+
+Estimated reduction:
+Z%
+
+IMPORTANT:
+
+These are estimates.
+
+Do NOT claim these are actual Claude/Copilot token savings.
+
+Do NOT claim actual billing reduction.
+
+The objective is to determine whether the reduced context is still sufficient.
+
+============================================================
+TEST 10 — GOLD STANDARD / HUMAN SANITY CHECK
+============================================================
+
+For each major test, create a simple table:
+
+| File | ContextPilot | Human assessment |
+|------|--------------|------------------|
+| FileA.cs | Selected | Required |
+| FileB.cs | Selected | Useful |
+| FileC.cs | Selected | Unnecessary |
+| FileD.cs | Excluded | Correct |
+| FileE.cs | Excluded | SHOULD HAVE BEEN SELECTED |
+
+You are acting as the evaluator.
+
+Do not assume ContextPilot is correct simply because its algorithm selected something.
+
+Look for false positives and false negatives.
+
+============================================================
+SCORING
+============================================================
+
+Give ContextPilot a score from 1–10 for:
+
+1. Repository discovery
+2. Project discovery
+3. Cross-repository discovery
+4. Symbol discovery
+5. Dependency analysis
+6. Relevance ranking
+7. Context selection
+8. Test discovery
+9. Configuration discovery
+10. Change-impact analysis
+11. Avoiding irrelevant context
+12. Avoiding missing critical context
+13. Token optimization
+14. Overall usefulness
+
+Also provide:
+
+Overall score: X/10
+
+============================================================
+MOST IMPORTANT SECTION — MISSED CONTEXT
+============================================================
+
+Create a section called:
+
+"CRITICAL MISSED CONTEXT"
+
+List every important file/symbol/dependency that ContextPilot failed to select.
+
+For each one explain:
+
+- What it was
+- Why it was required
+- Why ContextPilot probably missed it
+- Which signal could have detected it
+
+Examples:
+
+- dependency relationship
+- symbol reference
+- interface implementation
+- project reference
+- API relationship
+- configuration
+- test relationship
+- filename/path
+- namespace
+- inheritance
+- DI registration
+
+This section is more important than the token-reduction percentage.
+
+============================================================
+SECOND MOST IMPORTANT SECTION — UNNECESSARY CONTEXT
+============================================================
+
+Create:
+
+"UNNECESSARY CONTEXT"
+
+List files ContextPilot selected that were not actually needed.
+
+For each explain:
+
+- Why it was selected
+- Why it was unnecessary
+- Which ranking signal probably caused the false positive
+
+============================================================
+PERFORMANCE
+============================================================
+
+Measure approximately:
+
+- workspace discovery time
+- indexing time
+- query time
+- ranking time
+- optimization time
+
+Also determine whether repeated queries reuse the index rather than rescanning everything.
+
+============================================================
+SECURITY
+============================================================
+
+Verify that ContextPilot does not accidentally expose:
+
+- .env
+- credentials
+- private keys
+- certificates
+- secrets
+- bin
+- obj
+- node_modules
+- .git
+
+Report any problems.
+
+============================================================
+IMPORTANT RULES
+============================================================
+
+Do NOT implement the business tasks.
+
+Do NOT modify the 20 existing repositories.
+
+Do NOT load all 20 repositories into Claude's conversation context.
+
+Use ContextPilot as the context-discovery mechanism.
+
+Do NOT artificially make the tests easy for ContextPilot.
+
+Use actual repositories and actual relationships in this workspace.
+
+Do NOT report only token reduction.
+
+Context quality is more important than token reduction.
+
+If ContextPilot performs poorly, say so clearly.
+
+Do not change the algorithm simply to make this evaluation look better.
+
+============================================================
+FINAL REPORT
+============================================================
+
+At the end provide:
+
+1. Workspace summary
+2. Tests performed
+3. ContextPilot results
+4. Critical missed context
+5. Unnecessary context
+6. Cross-repository findings
+7. Token estimates
+8. Performance
+9. Security findings
+10. Scorecard
+11. Top 5 weaknesses
+12. Top 5 improvements
+13. Whether ContextPilot is ready for Phase 4
+
+Most importantly, answer:
+
+"Would I trust ContextPilot to guide Claude's repository exploration for a real development task?"
+
+Answer:
+
+YES
+YES, WITH CAVEATS
+or
+NO
+
+Explain why.
+
+STOP AFTER THIS EVALUATION.
+
+Do not begin Phase 4 yet.
